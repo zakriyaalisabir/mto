@@ -355,18 +355,7 @@ mto_unmount() {
   # Keep hook functions defined to avoid DEBUG-trap race conditions in bash.
 }
 
-# Mount agent session: all commands get output-compressed via mto proxy
-mto_agent() {
-  export MTO_AGENT_SESSION=1
-  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint find cat; do
-    if command -v "$__mto_cmd" >/dev/null 2>&1; then
-      eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
-    fi
-  done
-  unset __mto_cmd
-  echo "mto: agent session active — command outputs will be compressed"
-}
-
+# Proxy wrapper for explicit use: mto proxy -- <cmd>
 __mto_exec_wrapper() {
   local __mto_cmd="$1"
   shift
@@ -385,16 +374,6 @@ for __mto_cmd in $MTO_WRAP_COMMANDS; do
   fi
 done
 unset __mto_cmd
-
-# Auto-activate proxy if agent session was already set
-if [[ "${MTO_AGENT_SESSION:-0}" == "1" ]]; then
-  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint find cat; do
-    if command -v "$__mto_cmd" >/dev/null 2>&1; then
-      eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
-    fi
-  done
-  unset __mto_cmd
-fi
 
 # Enable observation only after the hook has fully installed, so setup
 # commands are not recorded and non-interactive test shells do not recurse.
@@ -449,22 +428,11 @@ fi
 mto_unmount() {
   preexec_functions=(${preexec_functions:#__mto_zsh_preexec})
   precmd_functions=(${precmd_functions:#__mto_zsh_precmd})
-  unset MTO_SHELL_INTEGRATION MTO_WRAP_COMMANDS MTO_LAST_OBSERVED_COMMAND MTO_HOOK_GUARD MTO_AGENT_SESSION
-  unfunction __mto_zsh_preexec __mto_zsh_precmd __mto_exec_wrapper __mto_proxy_wrapper mto_unmount mto_agent 2>/dev/null || true
+  unset MTO_SHELL_INTEGRATION MTO_WRAP_COMMANDS MTO_LAST_OBSERVED_COMMAND MTO_HOOK_GUARD
+  unfunction __mto_zsh_preexec __mto_zsh_precmd __mto_exec_wrapper __mto_proxy_wrapper mto_unmount 2>/dev/null || true
 }
 
-# Mount agent session: all commands get output-compressed via mto proxy
-mto_agent() {
-  export MTO_AGENT_SESSION=1
-  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint find cat; do
-    if command -v "$__mto_cmd" >/dev/null 2>&1; then
-      eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
-    fi
-  done
-  unset __mto_cmd
-  echo "mto: agent session active — command outputs will be compressed"
-}
-
+# Proxy wrapper for explicit use: mto proxy -- <cmd>
 __mto_exec_wrapper() {
   local __mto_cmd="$1"
   shift
@@ -483,16 +451,6 @@ for __mto_cmd in $MTO_WRAP_COMMANDS; do
   fi
 done
 unset __mto_cmd
-
-# Auto-activate proxy if agent session was already set
-if [[ "${MTO_AGENT_SESSION:-0}" == "1" ]]; then
-  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint find cat; do
-    if command -v "$__mto_cmd" >/dev/null 2>&1; then
-      eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
-    fi
-  done
-  unset __mto_cmd
-fi
 '''
     return template.replace("__MTO_WRAP_DEFAULT__", wraps)
 
