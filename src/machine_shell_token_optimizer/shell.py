@@ -360,6 +360,7 @@ mto_agent() {
   export MTO_AGENT_SESSION=1
   for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
     if command -v "$__mto_cmd" >/dev/null 2>&1; then
+      unalias "$__mto_cmd" 2>/dev/null
       eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
     fi
   done
@@ -381,6 +382,7 @@ __mto_proxy_wrapper() {
 
 for __mto_cmd in $MTO_WRAP_COMMANDS; do
   if command -v "$__mto_cmd" >/dev/null 2>&1; then
+    unalias "$__mto_cmd" 2>/dev/null
     eval "$__mto_cmd() { __mto_exec_wrapper $__mto_cmd \"\$@\"; }"
   fi
 done
@@ -390,6 +392,7 @@ unset __mto_cmd
 if [[ "${MTO_AGENT_SESSION:-0}" == "1" ]]; then
   for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
     if command -v "$__mto_cmd" >/dev/null 2>&1; then
+      unalias "$__mto_cmd" 2>/dev/null
       eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
     fi
   done
@@ -458,6 +461,7 @@ mto_agent() {
   export MTO_AGENT_SESSION=1
   for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
     if command -v "$__mto_cmd" >/dev/null 2>&1; then
+      unalias "$__mto_cmd" 2>/dev/null
       eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
     fi
   done
@@ -479,6 +483,7 @@ __mto_proxy_wrapper() {
 
 for __mto_cmd in $MTO_WRAP_COMMANDS; do
   if command -v "$__mto_cmd" >/dev/null 2>&1; then
+    unalias "$__mto_cmd" 2>/dev/null
     eval "$__mto_cmd() { __mto_exec_wrapper $__mto_cmd \"\$@\"; }"
   fi
 done
@@ -488,6 +493,7 @@ unset __mto_cmd
 if [[ "${MTO_AGENT_SESSION:-0}" == "1" ]]; then
   for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
     if command -v "$__mto_cmd" >/dev/null 2>&1; then
+      unalias "$__mto_cmd" 2>/dev/null
       eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
     fi
   done
