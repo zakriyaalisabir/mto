@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "machine-shell-token-optimizer"
+version = "0.2.0"
+description = "Shell-native local token optimization and command observation for bash/zsh"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Machine AI" }]
+dependencies = []
+keywords = ["shell", "bash", "zsh", "sqlite", "token-optimization", "cli"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Shells",
+  "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+tiktoken = ["tiktoken>=0.5"]
+model = ["transformers>=4.30", "torch>=2.0", "sentencepiece>=0.1.99"]
+
+[project.scripts]
+mto = "machine_shell_token_optimizer.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+machine_shell_token_optimizer = ["py.typed"]
+
+[tool.pytest.ini_options]
+minversion = "7.4"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
