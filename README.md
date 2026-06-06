@@ -21,35 +21,44 @@ git push origin main                  →    git push origin main (untouched)
 
 ## Install
 
+**Requires Python 3.11+**
+
 ```bash
+# One-line interactive setup
 bash scripts/setup.sh
 ```
 
-Asks interactively: shell (bash/zsh), which AI tools to wrap, compression level, optional local model.
-
-Then: `source ~/.zshrc` (or `~/.bashrc`).
-
-### Manual
+### From GitHub (pip)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+pip install git+https://github.com/zakriyaalisabir/mto.git
+mto model download
+```
+
+> If you get a Python version error, you're using your system Python. Use a compatible version:
+> ```bash
+> python3.11 -m pip install git+https://github.com/zakriyaalisabir/mto.git
+> # or
+> brew install python@3.13 && python3.13 -m pip install git+https://github.com/zakriyaalisabir/mto.git
+> ```
+
+### Lightweight install (no model, rule-based only)
+
+```bash
+pip install git+https://github.com/zakriyaalisabir/mto.git --no-deps
+```
+
+### From source
+
+```bash
+git clone https://github.com/zakriyaalisabir/mto.git && cd mto
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 mto init
+mto model download
 mto install-shell --shell zsh --wrap codex,claude,llm,aider,sgpt,kiro-cli
 source ~/.zshrc
 ```
-
-### Optional: Local Compression Model
-
-A 353MB quantized LLM that runs locally for deeper semantic compression:
-
-```bash
-pip install -e ".[model]"
-mto model download
-mto model status
-```
-
-Activates automatically in moderate/aggressive modes. No network calls, fully offline.
 
 ---
 
