@@ -48,6 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("--config", help="Config path; default ~/.config/mto/config.json")
     p_init.add_argument("--db-path", help="SQLite path override")
     p_init.add_argument("--force", action="store_true", help="Overwrite existing config")
+    p_init.add_argument("--agent", nargs="?", const="all", help="Install agent instructions (codex, kiro-cli, or 'all')")
     p_init.set_defaults(func=cmd_init)
 
     p_hook = sub.add_parser("shell-hook", help="Print bash/zsh hook script for eval/source")
@@ -152,7 +153,96 @@ def cmd_init(args: argparse.Namespace) -> int:
     storage.close()
     print(f"config: {config_path}")
     print(f"database: {Path(db_path).expanduser() if db_path else 'default'}")
+    if args.agent:
+        _install_agent_instructions(args.agent)
     return 0
+
+
+_MTO_AGENT_INSTRUCTIONS = """
+# MTO — Machine Token Optimizer
+
+When running shell commands, use `mto proxy --` prefix to get compressed output.
+This saves context window tokens by filtering verbose command outputs.
+
+## Usage
+
+Instead of:
+```bash
+git log -20
+git diff
+cargo test
+docker ps
+kubectl get pods
+cat file.py
+find . -name "*.ts"
+ps aux
+```
+
+Use:
+```bash
+mto proxy -- git log -20
+mto proxy -- git diff
+mto proxy -- cargo test
+mto proxy -- docker ps
+mto proxy -- kubectl get pods
+mto proxy -- cat file.py
+mto proxy -- find . -name "*.ts"
+mto proxy -- ps aux
+```
+
+## Why
+
+- `git log -50` → 433 lines becomes 50 lines (-88%)
+- `cargo test` → 200 lines becomes ~5 lines (failures + summary)
+- `find . -name "*.py"` → 3000+ lines becomes 31 lines (-99%)
+- `ps aux` → 650 lines becomes 61 lines (-91%)
+
+## Rules
+
+- Always prefix shell commands with `mto proxy --` when reading output
+- Do NOT prefix commands that write/modify (git push, rm, mv, docker run)
+- If mto is not available, fall back to running commands directly
+"""
+
+_MTO_MARKER = "# MTO — Machine Token Optimizer"
+
+
+def _install_agent_instructions(agent: str) -> None:
+    """Install MTO instructions into agent config locations."""
+    locations: list[Path] = []
+
+    # Local AGENTS.md (current project)
+    local_agents = Path.cwd() / "AGENTS.md"
+    locations.append(local_agents)
+
+    # Global ~/AGENTS.md
+    locations.append(Path.home() / "AGENTS.md")
+
+    if agent in ("all", "codex"):
+        # Codex: ~/.codex/AGENTS.md
+        codex_dir = Path.home() / ".codex"
+        codex_dir.mkdir(parents=True, exist_ok=True)
+        locations.append(codex_dir / "AGENTS.md")
+
+    if agent in ("all", "kiro-cli", "kiro"):
+        # Kiro: ~/.kiro/AGENTS.md
+        kiro_dir = Path.home() / ".kiro"
+        kiro_dir.mkdir(parents=True, exist_ok=True)
+        locations.append(kiro_dir / "AGENTS.md")
+
+    for path in locations:
+        _inject_instructions(path)
+        print(f"agent instructions: {path}")
+
+
+def _inject_instructions(path: Path) -> None:
+    """Append MTO instructions to file if not already present."""
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if _MTO_MARKER in existing:
+        return  # already installed
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write("\n" + _MTO_AGENT_INSTRUCTIONS.strip() + "\n")
 
 
 def cmd_shell_hook(args: argparse.Namespace) -> int:
