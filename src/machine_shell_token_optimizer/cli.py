@@ -136,6 +136,11 @@ def build_parser() -> argparse.ArgumentParser:
     model_sub.add_parser("status", help="Show model availability and download status").set_defaults(func=cmd_model_status)
     model_sub.add_parser("download", help="Download the model to local cache").set_defaults(func=cmd_model_download)
 
+    p_proxy = sub.add_parser("proxy", help="Run a command and compress its output before returning")
+    p_proxy.add_argument("--raw", action="store_true", help="Disable output compression (passthrough + tracking)")
+    p_proxy.add_argument("argv", nargs=argparse.REMAINDER)
+    p_proxy.set_defaults(func=cmd_proxy)
+
     return parser
 
 
@@ -340,6 +345,42 @@ def cmd_model_download(args: argparse.Namespace) -> int:
     path = download_model()
     print(f"Model cached at: {path}")
     return 0
+
+
+def cmd_proxy(args: argparse.Namespace) -> int:
+    """Run command, capture output, compress it, print compressed version."""
+    import subprocess
+    from .output_filters import filter_output
+    from .tokenizer import estimate_tokens
+
+    argv = _strip_remainder_separator(args.argv)
+    if not argv:
+        print("error: no command provided", file=sys.stderr)
+        return 1
+
+    command_name = Path(argv[0]).name
+    cmd_args = argv[1:]
+
+    try:
+        completed = subprocess.run(
+            argv, text=True, capture_output=True, check=False,
+        )
+    except FileNotFoundError:
+        print(f"error: command not found: {argv[0]}", file=sys.stderr)
+        return 127
+
+    output = (completed.stdout or "") + (completed.stderr or "")
+
+    if args.raw or not output:
+        sys.stdout.write(completed.stdout or "")
+        sys.stderr.write(completed.stderr or "")
+        return completed.returncode
+
+    compressed = filter_output(command_name, cmd_args, output, completed.returncode)
+    sys.stdout.write(compressed)
+    if not compressed.endswith("\n"):
+        sys.stdout.write("\n")
+    return completed.returncode
 
 
 def _args_or_stdin(parts: list[str]) -> str:
