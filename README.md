@@ -242,6 +242,8 @@ pytest
 
 ## Architecture
 
+See [docs/system-flow.md](docs/system-flow.md) for full mermaid diagrams of the system.
+
 ```
 ┌────────────────────────────────────────────────────┐
 │  Your shell (zsh/bash)                              │
