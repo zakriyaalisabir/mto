@@ -96,15 +96,21 @@ def _filter_git_status(output: str) -> str:
 
 def _filter_git_log(output: str) -> str:
     lines = output.strip().splitlines()
-    # Keep one-line format if already compact
-    if all(len(l) < 120 for l in lines[:5]):
-        return "\n".join(lines[:20])
-    # Extract commit lines
+    # Already compact (one-line format) — pass through
+    if all(len(l) < 120 for l in lines[:5]) and not any(l.startswith("Author:") for l in lines[:10]):
+        return output
+    # Verbose format: extract hash + first line of message into one-line-per-commit
     commits = []
+    current_hash = ""
     for line in lines:
-        if line.startswith("commit ") or re.match(r"^[0-9a-f]{7,}", line):
-            commits.append(line.strip()[:100])
-    return "\n".join(commits[:20]) if commits else "\n".join(lines[:20])
+        if line.startswith("commit "):
+            current_hash = line[7:14]  # short hash
+        elif line.startswith("    ") and current_hash:
+            msg = line.strip()
+            if msg:  # first non-empty indented line is the subject
+                commits.append(f"{current_hash} {msg}")
+                current_hash = ""
+    return "\n".join(commits) if commits else output
 
 
 def _filter_git_diff(output: str) -> str:
