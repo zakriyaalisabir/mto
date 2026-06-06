@@ -55,9 +55,38 @@ echo "─── Installing mto ───"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="$SCRIPT_DIR/.venv"
 
+# Find Python >= 3.11
+find_python() {
+  for cmd in python3.13 python3.12 python3.11 python3; do
+    if command -v "$cmd" &>/dev/null; then
+      version=$("$cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+      major=$(echo "$version" | cut -d. -f1)
+      minor=$(echo "$version" | cut -d. -f2)
+      if [ "$major" -ge 3 ] && [ "$minor" -ge 11 ]; then
+        echo "$cmd"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+PYTHON_CMD=$(find_python)
+if [ -z "$PYTHON_CMD" ]; then
+  echo "error: Python >= 3.11 is required but not found."
+  echo
+  echo "Install Python 3.11+ using one of:"
+  echo "  brew install python@3.13       # macOS"
+  echo "  sudo apt install python3.13    # Ubuntu/Debian"
+  echo "  pyenv install 3.13.1           # pyenv"
+  exit 1
+fi
+
+echo "Using: $PYTHON_CMD ($($PYTHON_CMD --version))"
+
 if [ ! -d "$VENV_DIR" ]; then
   echo "Creating virtual environment..."
-  python3 -m venv "$VENV_DIR" 2>/dev/null || python -m venv "$VENV_DIR"
+  "$PYTHON_CMD" -m venv "$VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
