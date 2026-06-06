@@ -115,6 +115,14 @@ else
   mto install-shell --shell "$SHELL_CHOICE"
 fi
 
+# Enable agent session by default (proxy all dev command outputs)
+RCFILE="$HOME/.${SHELL_CHOICE}rc"
+if ! grep -q "MTO_AGENT_SESSION" "$RCFILE" 2>/dev/null; then
+  echo "" >> "$RCFILE"
+  echo "# mto: auto-compress command outputs in agent sessions" >> "$RCFILE"
+  echo "export MTO_AGENT_SESSION=1" >> "$RCFILE"
+fi
+
 # Install model if requested
 if [[ "$INSTALL_MODEL" =~ ^[Yy] ]]; then
   echo "─── Installing model backend ───"

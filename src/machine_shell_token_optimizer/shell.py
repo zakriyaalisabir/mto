@@ -358,6 +358,12 @@ mto_unmount() {
 # Mount agent session: all commands get output-compressed via mto proxy
 mto_agent() {
   export MTO_AGENT_SESSION=1
+  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
+    if command -v "$__mto_cmd" >/dev/null 2>&1; then
+      eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
+    fi
+  done
+  unset __mto_cmd
   echo "mto: agent session active — command outputs will be compressed"
 }
 
@@ -380,7 +386,7 @@ for __mto_cmd in $MTO_WRAP_COMMANDS; do
 done
 unset __mto_cmd
 
-# Proxy common dev commands when inside an agent session
+# Auto-activate proxy if agent session was already set
 if [[ "${MTO_AGENT_SESSION:-0}" == "1" ]]; then
   for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
     if command -v "$__mto_cmd" >/dev/null 2>&1; then
@@ -450,6 +456,12 @@ mto_unmount() {
 # Mount agent session: all commands get output-compressed via mto proxy
 mto_agent() {
   export MTO_AGENT_SESSION=1
+  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
+    if command -v "$__mto_cmd" >/dev/null 2>&1; then
+      eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
+    fi
+  done
+  unset __mto_cmd
   echo "mto: agent session active — command outputs will be compressed"
 }
 
@@ -472,7 +484,7 @@ for __mto_cmd in $MTO_WRAP_COMMANDS; do
 done
 unset __mto_cmd
 
-# Proxy common dev commands when inside an agent session
+# Auto-activate proxy if agent session was already set
 if [[ "${MTO_AGENT_SESSION:-0}" == "1" ]]; then
   for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
     if command -v "$__mto_cmd" >/dev/null 2>&1; then
