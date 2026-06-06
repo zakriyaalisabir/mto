@@ -87,6 +87,8 @@ def shell_preexec(command: str, *, shell: str, pid: int | None = None, cwd: str 
     classifier = InputClassifier()
     classification = classifier.classify(command)
     try:
+        # Opportunistic history cleanup (cheap check)
+        storage.cleanup_history(cfg.history_days)
         return storage.log_shell_event(
             raw_command=command,
             shell=shell,
@@ -132,6 +134,14 @@ def execute_with_optional_optimization(
 
     cfg = load_config()
     command_name = Path(argv[0]).name
+    full_command = " ".join(argv)
+
+    # Check exclude_commands
+    if _is_excluded(full_command, cfg.exclude_commands):
+        completed = subprocess.run(argv, text=True, check=False,
+                                   timeout=timeout or cfg.default_timeout_seconds)
+        return int(completed.returncode)
+
     storage = ShellTokenStorage(db_path or cfg.db_path)
     optimizer = ShellTokenOptimizer(db_path=db_path or cfg.db_path, storage=storage, enabled=cfg.enabled, level=level)
     new_argv = list(argv)
@@ -198,7 +208,24 @@ def execute_with_optional_optimization(
             text=True,
             timeout=timeout if timeout is not None else cfg.default_timeout_seconds,
             check=False,
+            capture_output=cfg.tee_enabled and cfg.tee_mode != "never",
         )
+        # Tee system: save output on failure
+        if cfg.tee_enabled and cfg.tee_mode != "never" and completed.stdout:
+            output = (completed.stdout or "") + (completed.stderr or "")
+            if output:
+                from .tee import tee_output
+                tee_path = tee_output(
+                    command_name, output, completed.returncode,
+                    tee_dir=cfg.tee_dir, mode=cfg.tee_mode, max_files=cfg.tee_max_files,
+                )
+                if tee_path:
+                    print(f"[full output: {tee_path}]", file=sys.stderr)
+            # Print stdout/stderr since we captured it
+            if completed.stdout:
+                sys.stdout.write(completed.stdout)
+            if completed.stderr:
+                sys.stderr.write(completed.stderr)
         return int(completed.returncode)
     finally:
         optimizer.close()
@@ -266,6 +293,25 @@ def _should_ignore_command(command: str) -> bool:
         "history -a",
     )
     return stripped.startswith(ignore_prefixes)
+
+
+def _is_excluded(command: str, exclude_patterns: list[str]) -> bool:
+    """Check if command matches any exclude pattern."""
+    if not exclude_patterns:
+        return False
+    # Strip env prefixes (VAR=val, sudo)
+    stripped = re.sub(r"^(?:sudo\s+|[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)*", "", command.strip())
+    for pattern in exclude_patterns:
+        if pattern.startswith("^"):
+            try:
+                if re.search(pattern, stripped):
+                    return True
+            except re.error:
+                if stripped.startswith(pattern.lstrip("^")):
+                    return True
+        elif stripped == pattern or stripped.startswith(pattern + " "):
+            return True
+    return False
 
 
 def _bash_hook(wraps: str) -> str:

@@ -86,6 +86,112 @@ export MTO_OPTIMIZATION_LEVEL=aggressive
 
 ---
 
+## Configuration
+
+### Config file location
+
+| Platform | Path |
+|----------|------|
+| Linux/macOS | `~/.config/mto/config.json` |
+
+```bash
+mto config            # show current configuration
+mto config --create   # create config file with defaults
+```
+
+### Full config structure
+
+```json
+{
+  "enabled": true,
+  "observe_all_commands": true,
+  "optimization_level": "aggressive",
+  "wrap_commands": ["codex", "claude", "llm"],
+  "optimize_commands": {
+    "codex": "argv_join",
+    "claude": "argv_join",
+    "llm": "argv_join"
+  },
+  "history_days": 90,
+  "tee_enabled": true,
+  "tee_mode": "failures",
+  "tee_max_files": 20,
+  "exclude_commands": ["git rebase", "git cherry-pick", "docker exec"]
+}
+```
+
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `MTO_DISABLED=1` | Disable mto for a single command (`MTO_DISABLED=1 codex "..."`) |
+| `MTO_OPTIMIZATION_LEVEL` | Override optimization level |
+| `MTO_WRAP_COMMANDS` | Override wrapped commands |
+| `MTO_TEE_DIR` | Override tee output directory |
+| `MTO_DB_PATH` | Override SQLite database path |
+| `MTO_ENABLED=0` | Disable mto globally |
+
+### Tee system
+
+When a wrapped command fails, mto saves the full raw output to a local file:
+
+```
+FAILED: exit code 1
+[full output: ~/.local/share/mto/tee/1707753600_cargo_test.log]
+```
+
+Your AI assistant can read the file for full context without re-running the command.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `tee_enabled` | `true` | Enable/disable |
+| `tee_mode` | `"failures"` | `"failures"`, `"always"`, `"never"` |
+| `tee_max_files` | `20` | Rotation: keep last N files |
+| Min size | 500 bytes | Outputs shorter than this are not saved |
+| Max size | 1 MB | Truncated above this |
+
+### Excluding commands from auto-rewrite
+
+Prevent specific commands from being optimized by the hook:
+
+```json
+{
+  "exclude_commands": ["git rebase", "git cherry-pick", "docker exec"]
+}
+```
+
+Patterns match against the full command after stripping env prefixes (`sudo`, `VAR=val`):
+- `"psql"` excludes both `psql -h localhost` and `PGPASSWORD=x psql -h localhost`
+- `"git push"` excludes `git push origin main` but not `git status`
+
+Patterns starting with `^` are treated as regex:
+
+```json
+{
+  "exclude_commands": ["^curl", "^wget", "git rebase"]
+}
+```
+
+Or for a single invocation:
+
+```bash
+MTO_DISABLED=1 git rebase main
+```
+
+### Per-project filters
+
+Create `.mto/filters.json` in your project root to add project-specific exclude commands:
+
+```json
+{
+  "exclude_commands": ["npm test", "cargo build"]
+}
+```
+
+These merge with your global config.
+
+---
+
 ## Test Commands
 
 ```bash
@@ -110,8 +216,14 @@ mto exec --optimize --dry-run -- codex "Please please help me fix this"
 # Shell command preserved (never optimized)
 mto optimize "git push origin main"
 
+# Disable for single command
+MTO_DISABLED=1 mto optimize "this will not be optimized"
+
 # Check model status
 mto model status
+
+# View config
+mto config
 
 # View stats
 mto stats
@@ -176,35 +288,6 @@ The model activates automatically in `moderate` and `aggressive` modes as an add
 - Redacts secrets before SQLite storage
 - Preserves code blocks, file paths, and error lines in optimized output
 - Model output rejected if it drops any critical content
-
----
-
-## Config
-
-Default config: `~/.config/mto/config.json`
-
-```json
-{
-  "enabled": true,
-  "observe_all_commands": true,
-  "optimization_level": "aggressive",
-  "wrap_commands": ["codex", "claude", "llm"],
-  "optimize_commands": {
-    "codex": "argv_join",
-    "claude": "argv_join",
-    "llm": "argv_join"
-  }
-}
-```
-
-Environment overrides:
-
-```bash
-export MTO_ENABLED=1
-export MTO_OPTIMIZATION_LEVEL=aggressive
-export MTO_WRAP_COMMANDS="codex claude llm aider"
-export MTO_DB_PATH=/tmp/mto.sqlite3
-```
 
 ---
 

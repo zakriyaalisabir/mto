@@ -161,6 +161,18 @@ class ShellTokenStorage:
             self._conn.execute(f"DELETE FROM {table}")  # noqa: S608
         self._conn.commit()
 
+    def cleanup_history(self, days: int) -> int:
+        """Delete records older than N days. Returns count deleted."""
+        deleted = 0
+        for table in ("shell_command_events", "optimization_runs"):
+            cur = self._conn.execute(
+                f"DELETE FROM {table} WHERE created_at < datetime('now', ?)",  # noqa: S608
+                (f"-{days} days",),
+            )
+            deleted += cur.rowcount
+        self._conn.commit()
+        return deleted
+
     def _try_enable_fts(self) -> None:
         try:
             self._conn.execute(

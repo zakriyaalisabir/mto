@@ -119,6 +119,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--json", action="store_true")
     p_status.set_defaults(func=cmd_status)
 
+    p_config = sub.add_parser("config", help="Show or create config file")
+    p_config.add_argument("--create", action="store_true", help="Create config file with defaults")
+    p_config.add_argument("--path", help="Custom config path")
+    p_config.set_defaults(func=cmd_config)
+
     p_model = sub.add_parser("model", help="Manage the optional local compression model")
     model_sub = p_model.add_subparsers(dest="model_command", required=True)
     model_sub.add_parser("status", help="Show model availability and download status").set_defaults(func=cmd_model_status)
@@ -171,7 +176,11 @@ def cmd_shell_precmd(args: argparse.Namespace) -> int:
 
 
 def cmd_optimize(args: argparse.Namespace) -> int:
+    from .config import is_disabled
     text = _args_or_stdin(args.text)
+    if is_disabled():
+        print(text)
+        return 0
     level = _resolve_level(args.level)
     opt = ShellTokenOptimizer(db_path=args.db_path, level=level)
     try:
@@ -263,6 +272,23 @@ def cmd_status(args: argparse.Namespace) -> int:
     else:
         for key, value in data.items():
             print(f"{key}: {value}")
+    return 0
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    from .config import default_config_path, write_default_config
+    if args.create:
+        path = write_default_config(args.path, force=True)
+        print(f"config created: {path}")
+        return 0
+    config_path = Path(args.path).expanduser() if args.path else default_config_path()
+    if not config_path.exists():
+        print(f"no config file at {config_path}")
+        print("run: mto config --create")
+        return 1
+    cfg = load_config(config_path)
+    from dataclasses import asdict
+    print(json.dumps(asdict(cfg), indent=2, default=str))
     return 0
 
 

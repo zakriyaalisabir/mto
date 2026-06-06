@@ -77,4 +77,15 @@ class ShellConfig:
     optimize_commands: dict[str, str] = field(default_factory=dict)
     store_full_text: bool = False
     default_timeout_seconds: float = 300.0
-    optimization_level: str = "conservative"
+    optimization_level: str = "aggressive"
+    # Retention
+    history_days: int = 90
+    # Tee system
+    tee_enabled: bool = True
+    tee_mode: str = "failures"  # "failures", "always", "never"
+    tee_max_files: int = 20
+    tee_dir: str | None = None
+    # Hooks
+    exclude_commands: list[str] = field(default_factory=list)
+    # Per-project filters
+    project_filters_file: str = ".mto/filters.json"

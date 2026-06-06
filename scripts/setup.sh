@@ -50,6 +50,17 @@ fi
 
 echo
 echo "─── Installing mto ───"
+
+# Ensure we're in a compatible venv
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+VENV_DIR="$SCRIPT_DIR/.venv"
+
+if [ ! -d "$VENV_DIR" ]; then
+  echo "Creating virtual environment..."
+  python3 -m venv "$VENV_DIR" 2>/dev/null || python -m venv "$VENV_DIR"
+fi
+
+source "$VENV_DIR/bin/activate"
 pip install -e ".[dev]" --quiet
 
 echo "─── Initializing config ───"

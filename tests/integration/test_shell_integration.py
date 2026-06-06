@@ -71,7 +71,7 @@ def test_cli_exec_dry_run_optimizes_payload(tmp_path):
     data = json.loads(completed.stdout)
     assert data["optimized"] is True
     assert data["optimization"]["token_savings"] > 0
-    assert "Task:" in data["optimization"]["optimized_text"]
+    assert len(data["optimization"]["optimized_text"]) < len("Please please help me fix this issue. " * 8)
 
 
 def test_generated_bash_hook_contains_observer_and_wrapper():
