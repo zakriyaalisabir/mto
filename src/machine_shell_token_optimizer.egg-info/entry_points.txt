@@ -1,2 +1,0 @@
-[console_scripts]
-mto = machine_shell_token_optimizer.cli:main
