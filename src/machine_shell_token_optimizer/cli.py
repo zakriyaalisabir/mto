@@ -108,6 +108,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats.add_argument("--reset", action="store_true", help="Reset all stats (clear all tables)")
     p_stats.set_defaults(func=cmd_stats)
 
+    p_audit = sub.add_parser("audit", help="Review observed commands by risk level")
+    p_audit.add_argument("--risk", choices=["high", "medium", "low"], default="high", help="Filter by risk level")
+    p_audit.add_argument("--limit", type=int, default=20, help="Max entries to show")
+    p_audit.add_argument("--db-path")
+    p_audit.add_argument("--json", action="store_true")
+    p_audit.set_defaults(func=cmd_audit)
+
     p_feedback = sub.add_parser("feedback", help="Add feedback for an optimization run")
     p_feedback.add_argument("--id", required=True, dest="run_id")
     p_feedback.add_argument("--rating", choices=["good", "bad"], required=True)
@@ -245,6 +252,31 @@ def cmd_stats(args: argparse.Namespace) -> int:
             print("top commands:")
             for item in stats["top_commands"]:  # type: ignore[index]
                 print(f"  {item['command_name']}: {item['usage_count']}x")
+    return 0
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    storage = ShellTokenStorage(args.db_path)
+    try:
+        rows = storage.connection.execute(
+            """SELECT created_at, raw_command_preview, cwd, risk_level, exit_code
+               FROM shell_command_events
+               WHERE risk_level = ?
+               ORDER BY created_at DESC LIMIT ?""",
+            (args.risk, args.limit),
+        ).fetchall()
+    finally:
+        storage.close()
+    if args.json:
+        print(json.dumps([dict(r) for r in rows], indent=2, default=str))
+    else:
+        if not rows:
+            print(f"no {args.risk}-risk commands found")
+            return 0
+        for r in rows:
+            exit_str = f" exit={r['exit_code']}" if r['exit_code'] is not None else ""
+            print(f"[{r['created_at']}] {r['raw_command_preview']}{exit_str}")
+            print(f"  cwd: {r['cwd']}")
     return 0
 
 
