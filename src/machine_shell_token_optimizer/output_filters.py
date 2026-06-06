@@ -24,7 +24,7 @@ def filter_output(command_name: str, args: list[str], output: str, exit_code: in
             return _filter_git_status(output)
         if sub == "log":
             return _filter_git_log(output)
-        if sub == "diff":
+        if sub in ("diff", "show"):
             return _filter_git_diff(output)
         if sub in ("push", "pull", "fetch", "add", "commit"):
             return _filter_git_action(sub, output, exit_code)
