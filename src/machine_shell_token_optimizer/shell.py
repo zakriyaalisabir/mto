@@ -368,13 +368,15 @@ __mto_proxy_wrapper() {
   command mto proxy -- "$__mto_cmd" "$@"
 }
 
-# Activate agent session: proxy dev commands that are NOT already aliased
+# Activate agent session: proxy dev commands, preserving user aliases
 mto_agent() {
   export MTO_AGENT_SESSION=1
-  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint find cat; do
-    # Skip if user has an alias for this command
-    alias "$__mto_cmd" >/dev/null 2>&1 && continue
-    if command -v "$__mto_cmd" >/dev/null 2>&1; then
+  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
+    if alias "$__mto_cmd" >/dev/null 2>&1; then
+      # Preserve existing alias flags by wrapping: alias ls='mto proxy -- ls --color=auto'
+      local __mto_orig=$(alias "$__mto_cmd" 2>/dev/null | sed "s/.*='\(.*\)'/\1/" | sed 's/.*="\(.*\)"/\1/')
+      alias "$__mto_cmd"="command mto proxy -- $__mto_orig"
+    elif command -v "$__mto_cmd" >/dev/null 2>&1; then
       eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
     fi
   done
@@ -463,13 +465,15 @@ __mto_proxy_wrapper() {
   command mto proxy -- "$__mto_cmd" "$@"
 }
 
-# Activate agent session: proxy dev commands that are NOT already aliased
+# Activate agent session: proxy dev commands, preserving user aliases
 mto_agent() {
   export MTO_AGENT_SESSION=1
-  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint find cat; do
-    # Skip if user has an alias for this command
-    alias "$__mto_cmd" >/dev/null 2>&1 && continue
-    if command -v "$__mto_cmd" >/dev/null 2>&1; then
+  for __mto_cmd in git docker kubectl cargo npm pnpm yarn pytest go ruff eslint grep find ls cat; do
+    if alias "$__mto_cmd" >/dev/null 2>&1; then
+      # Preserve existing alias flags by wrapping: alias ls='mto proxy -- ls --color=auto'
+      local __mto_orig=$(alias "$__mto_cmd" 2>/dev/null | sed "s/.*='\(.*\)'/\1/" | sed 's/.*="\(.*\)"/\1/')
+      alias "$__mto_cmd"="command mto proxy -- $__mto_orig"
+    elif command -v "$__mto_cmd" >/dev/null 2>&1; then
       eval "$__mto_cmd() { __mto_proxy_wrapper $__mto_cmd \"\$@\"; }"
     fi
   done
