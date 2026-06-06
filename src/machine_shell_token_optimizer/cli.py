@@ -105,6 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats = sub.add_parser("stats", help="Show SQLite command/optimization stats")
     p_stats.add_argument("--db-path")
     p_stats.add_argument("--json", action="store_true")
+    p_stats.add_argument("--reset", action="store_true", help="Reset all stats (clear all tables)")
     p_stats.set_defaults(func=cmd_stats)
 
     p_feedback = sub.add_parser("feedback", help="Add feedback for an optimization run")
@@ -214,6 +215,10 @@ def cmd_exec(args: argparse.Namespace) -> int:
 def cmd_stats(args: argparse.Namespace) -> int:
     storage = ShellTokenStorage(args.db_path)
     try:
+        if args.reset:
+            storage.reset()
+            print("stats reset")
+            return 0
         stats = storage.stats()
     finally:
         storage.close()

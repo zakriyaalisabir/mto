@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -e
+
+echo "╔══════════════════════════════════════════╗"
+echo "║   mto - Shell Token Optimizer Setup      ║"
+echo "╚══════════════════════════════════════════╝"
+echo
+
+# Detect shell
+detect_shell() {
+  if [ -n "$ZSH_VERSION" ]; then echo "zsh"
+  elif [ -n "$BASH_VERSION" ]; then echo "bash"
+  else basename "$SHELL"; fi
+}
+
+DEFAULT_SHELL=$(detect_shell)
+
+read -p "Which shell do you use? [bash/zsh] ($DEFAULT_SHELL): " SHELL_CHOICE
+SHELL_CHOICE=${SHELL_CHOICE:-$DEFAULT_SHELL}
+
+if [[ "$SHELL_CHOICE" != "bash" && "$SHELL_CHOICE" != "zsh" ]]; then
+  echo "error: unsupported shell '$SHELL_CHOICE'. Use bash or zsh."
+  exit 1
+fi
+
+# Select AI tools to wrap
+echo
+echo "Which AI/LLM tools should mto optimize? (space-separated)"
+echo "Common options: codex claude llm aider sgpt kiro-cli"
+echo
+read -p "Tools to wrap (or press Enter for none): " WRAP_TOOLS
+
+# Optimization level
+echo
+echo "Optimization level:"
+echo "  conservative - minimal filler removal (safe, ~30% savings)"
+echo "  moderate     - filler + stop-phrases + dedup (~60% savings)"
+echo "  aggressive   - maximum compression + local model (~70%+ savings)"
+echo
+read -p "Level? [conservative/moderate/aggressive] (aggressive): " LEVEL
+LEVEL=${LEVEL:-aggressive}
+
+# Install model?
+INSTALL_MODEL="n"
+if [[ "$LEVEL" == "moderate" || "$LEVEL" == "aggressive" ]]; then
+  echo
+  read -p "Install local compression model (~353MB download)? [y/N]: " INSTALL_MODEL
+  INSTALL_MODEL=${INSTALL_MODEL:-n}
+fi
+
+echo
+echo "─── Installing mto ───"
+pip install -e ".[dev]" --quiet
+
+echo "─── Initializing config ───"
+mto init
+
+# Set optimization level in config
+CONFIG_PATH="$HOME/.config/mto/config.json"
+if command -v python3 &>/dev/null; then
+  python3 -c "
+import json, pathlib
+p = pathlib.Path('$CONFIG_PATH')
+cfg = json.loads(p.read_text())
+cfg['optimization_level'] = '$LEVEL'
+p.write_text(json.dumps(cfg, indent=2) + '\n')
+"
+fi
+
+# Install shell hook
+echo "─── Installing $SHELL_CHOICE hook ───"
+if [ -n "$WRAP_TOOLS" ]; then
+  mto install-shell --shell "$SHELL_CHOICE" --wrap "$WRAP_TOOLS"
+else
+  mto install-shell --shell "$SHELL_CHOICE"
+fi
+
+# Install model if requested
+if [[ "$INSTALL_MODEL" =~ ^[Yy] ]]; then
+  echo "─── Installing model backend ───"
+  pip install -e ".[model]" --quiet
+  echo "─── Downloading model ───"
+  mto model download
+fi
+
+echo
+echo "╔══════════════════════════════════════════╗"
+echo "║   ✓ Setup complete!                      ║"
+echo "╚══════════════════════════════════════════╝"
+echo
+echo "Reload your shell:"
+if [ "$SHELL_CHOICE" = "zsh" ]; then
+  echo "  source ~/.zshrc"
+else
+  echo "  source ~/.bashrc"
+fi
+echo
+echo "Verify:"
+echo "  mto status"
+echo "  mto stats"
+echo "  mto model status"

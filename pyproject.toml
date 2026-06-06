@@ -24,7 +24,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
 tiktoken = ["tiktoken>=0.5"]
-model = ["transformers>=4.30", "torch>=2.0", "sentencepiece>=0.1.99"]
+model = ["llama-cpp-python>=0.2.0", "huggingface-hub>=0.20"]
 
 [project.scripts]
 mto = "machine_shell_token_optimizer.cli:main"

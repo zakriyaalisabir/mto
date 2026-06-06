@@ -147,6 +147,20 @@ class ShellTokenStorage:
     def close(self) -> None:
         self._conn.close()
 
+    def reset(self) -> None:
+        """Delete all data from tracked tables."""
+        tables = [
+            "shell_command_events",
+            "command_patterns",
+            "optimization_runs",
+            "optimization_patterns",
+            "optimization_feedback",
+            "reusable_context",
+        ]
+        for table in tables:
+            self._conn.execute(f"DELETE FROM {table}")  # noqa: S608
+        self._conn.commit()
+
     def _try_enable_fts(self) -> None:
         try:
             self._conn.execute(

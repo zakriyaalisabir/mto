@@ -259,7 +259,32 @@ def _remove_filler(text: str, level: OptimizationLevel = OptimizationLevel.CONSE
     out = re.sub(r"^\s*[.!?,;]\s*", "", out, flags=re.MULTILINE)  # leading punctuation on lines
     out = re.sub(r"\s+([.!?,;])", r"\1", out)  # space before punctuation
     out = re.sub(r"\n{3,}", "\n\n", out)
+    if level in (OptimizationLevel.MODERATE, OptimizationLevel.AGGRESSIVE):
+        out = _clean_fragments(out)
     return out.strip()
+
+
+def _clean_fragments(text: str) -> str:
+    """Remove orphan sentence fragments and capitalize the result."""
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    cleaned: list[str] = []
+    for s in sentences:
+        s = s.strip()
+        if not s:
+            continue
+        # Remove fragments that are just 1-2 words with no verb-like content
+        words = s.rstrip(".!?").split()
+        if len(words) <= 1 and not any(c.isupper() for c in s[:1]):
+            continue
+        cleaned.append(s)
+    result = " ".join(cleaned)
+    # Clean double punctuation
+    result = re.sub(r"([.!?])\s*\1+", r"\1", result)
+    result = re.sub(r"\.\s*\.", ".", result)
+    # Capitalize first character
+    if result and result[0].islower():
+        result = result[0].upper() + result[1:]
+    return result
 
 
 def _remove_stop_phrases(text: str, level: OptimizationLevel) -> str:
@@ -566,31 +591,33 @@ def _extract_shell_lines(text: str) -> list[str]:
 
 def _semantic_risk_penalty(original: str, candidate: str, level: OptimizationLevel = OptimizationLevel.CONSERVATIVE) -> float:
     penalty = 0.0
+    critical_penalty = 0.0
 
     for block in dict.fromkeys(_CODE_FENCE_RE.findall(original)):
         if block not in candidate:
-            penalty += 80.0
+            critical_penalty += 100.0
+
+    final_error = _extract_final_error_line(original)
+    if final_error and final_error not in candidate:
+        critical_penalty += 70.0
 
     for path in dict.fromkeys(_PATH_RE.findall(original)):
         cleaned_path = path.strip()
         if cleaned_path and cleaned_path not in candidate:
             penalty += 12.0
 
-    final_error = _extract_final_error_line(original)
-    if final_error and final_error not in candidate:
-        penalty += 70.0
-
     for shell_line in _extract_shell_lines(original):
         if shell_line and shell_line not in candidate:
             penalty += 25.0
 
-    # In aggressive mode, reduce penalty for pure prose inputs (no code/paths/commands)
-    if level == OptimizationLevel.AGGRESSIVE and penalty <= 0.0:
+    # Critical penalties (code blocks, error lines) are never reduced
+    # Non-critical penalties are halved in aggressive mode for pure prose
+    if level == OptimizationLevel.AGGRESSIVE and critical_penalty == 0.0 and penalty <= 0.0:
         return 0.0
-    if level == OptimizationLevel.AGGRESSIVE:
+    if level == OptimizationLevel.AGGRESSIVE and critical_penalty == 0.0:
         penalty *= 0.5
 
-    return min(100.0, penalty)
+    return critical_penalty + penalty
 
 
 def _try_model_compress(text: str) -> str | None:
