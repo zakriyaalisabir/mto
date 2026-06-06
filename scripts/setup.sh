@@ -123,6 +123,10 @@ if [[ "$INSTALL_MODEL" =~ ^[Yy] ]]; then
   mto model download
 fi
 
+echo "─── Installing agent shims ───"
+mto install-shims
+mto init --agent
+
 echo
 echo "╔══════════════════════════════════════════╗"
 echo "║   ✓ Setup complete!                      ║"

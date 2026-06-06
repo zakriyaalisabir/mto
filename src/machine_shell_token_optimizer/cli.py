@@ -142,6 +142,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_proxy.add_argument("argv", nargs=argparse.REMAINDER)
     p_proxy.set_defaults(func=cmd_proxy)
 
+    p_shims = sub.add_parser("install-shims", help="Install PATH shims for transparent output compression (agent sessions only)")
+    p_shims.add_argument("--commands", help="Comma-separated commands to shim (default: common dev tools)")
+    p_shims.add_argument("--dir", help="Shim directory (default: ~/.local/share/mto/shims)")
+    p_shims.set_defaults(func=cmd_install_shims)
+
+    p_unshims = sub.add_parser("uninstall-shims", help="Remove PATH shims")
+    p_unshims.add_argument("--dir", help="Shim directory (default: ~/.local/share/mto/shims)")
+    p_unshims.set_defaults(func=cmd_uninstall_shims)
+
+    p_shims_env = sub.add_parser("shims-env", help="Print env activation for current session (eval \"$(mto shims-env)\")")
+    p_shims_env.add_argument("--dir", help="Shim directory override")
+    p_shims_env.set_defaults(func=cmd_shims_env)
+
     return parser
 
 
@@ -202,6 +215,15 @@ mto proxy -- ps aux
 - Always prefix shell commands with `mto proxy --` when reading output
 - Do NOT prefix commands that write/modify (git push, rm, mv, docker run)
 - If mto is not available, fall back to running commands directly
+
+## Auto-Compression (Alternative)
+
+If shims are installed, activate transparent compression with:
+```bash
+eval "$(mto shims-env)"
+```
+After this, commands like `git log`, `find`, `docker ps` are automatically compressed
+without needing the `mto proxy --` prefix. Write commands pass through unchanged.
 """
 
 _MTO_MARKER = "# MTO — Machine Token Optimizer"
@@ -502,6 +524,36 @@ def _resolve_level(cli_level: str | None) -> OptimizationLevel:
         return OptimizationLevel(cli_level)
     cfg = load_config()
     return OptimizationLevel(cfg.optimization_level)
+
+
+def cmd_install_shims(args: argparse.Namespace) -> int:
+    from .shims import install_shims, get_shims_env, SHIM_DIR
+
+    shim_dir = Path(args.dir) if args.dir else None
+    commands = [c.strip() for c in args.commands.split(",")] if args.commands else None
+    created = install_shims(commands=commands, shim_dir=shim_dir)
+    target = shim_dir or SHIM_DIR
+    print(f"installed {len(created)} shims in {target}")
+    print(f"activate in agent sessions: eval \"$(mto shims-env)\"")
+    print("your shell rc files are NOT modified")
+    return 0
+
+
+def cmd_uninstall_shims(args: argparse.Namespace) -> int:
+    from .shims import uninstall_shims
+
+    shim_dir = Path(args.dir) if args.dir else None
+    removed = uninstall_shims(shim_dir=shim_dir)
+    print(f"removed {len(removed)} shims")
+    return 0
+
+
+def cmd_shims_env(args: argparse.Namespace) -> int:
+    from .shims import get_shims_env
+
+    shim_dir = Path(args.dir) if args.dir else None
+    print(get_shims_env(shim_dir))
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover
