@@ -1,105 +1,131 @@
-# Machine Shell Token Optimizer (`mto`)
+# `mto` — Machine Token Optimizer
 
-`mto` is a shell-native, model-independent command observer and local token optimizer for `bash` and `zsh`.
+**Local prompt compressor for AI shell tools.** Reduces token cost on what you *send* to LLMs.
 
-It integrates directly with your shell and gives you two behaviors:
+`mto` sits between you and your AI CLI tools (`codex`, `claude`, `llm`, `aider`, `sgpt`, `kiro-cli`). It observes your shell, detects when you're talking to an AI, and compresses your verbose human text into tight prompts — before they leave your machine.
 
-1. **Observe all interactive shell commands** through bash/zsh hooks and store redacted local metadata in SQLite.
-2. **Optimize text payloads** sent to AI CLIs (codex, claude, llm, aider, sgpt, kiro-cli) — automatically compressing verbose prompts before they reach the model.
+Shell commands pass through unchanged. Only natural-language payloads get compressed.
 
-Normal shell commands are preserved unchanged. Only AI-bound text gets compressed.
+```
+You type:                                  What reaches the LLM:
+─────────────────────────────────────────────────────────────────
+codex "Please please help me fix           codex "Fix this recurring
+this error over and over I don't           error. Provide fix command."
+know what to do please explain
+and give me the command"
+
+git push origin main                  →    git push origin main (untouched)
+```
 
 ---
 
-## Quick Setup (Interactive)
-
-One command to set up everything:
+## Install
 
 ```bash
 bash scripts/setup.sh
 ```
 
-This interactively asks you:
-- Which shell (bash/zsh)
-- Which AI tools to wrap (codex, claude, llm, aider, sgpt, kiro-cli, etc.)
-- Optimization level (conservative/moderate/aggressive)
-- Whether to install the local compression model (~353MB)
+Asks interactively: shell (bash/zsh), which AI tools to wrap, compression level, optional local model.
 
-Then reload your shell:
+Then: `source ~/.zshrc` (or `~/.bashrc`).
+
+### Manual
 
 ```bash
-source ~/.zshrc   # or source ~/.bashrc
-```
-
----
-
-## Manual Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 mto init
 mto install-shell --shell zsh --wrap codex,claude,llm,aider,sgpt,kiro-cli
 source ~/.zshrc
 ```
 
-Optional local model (enables ML-powered compression in moderate/aggressive mode):
+### Optional: Local Compression Model
+
+A 353MB quantized LLM that runs locally for deeper semantic compression:
 
 ```bash
 pip install -e ".[model]"
 mto model download
+mto model status
 ```
+
+Activates automatically in moderate/aggressive modes. No network calls, fully offline.
 
 ---
 
-## How It Works
+## Compression Levels
 
-After setup, your shell operates normally — but wrapped AI tools get their text payloads compressed automatically:
+| Level | Savings | Method |
+|-------|---------|--------|
+| `conservative` | ~30% | Filler word removal |
+| `moderate` | ~60% | + stop-phrase removal, clause dedup |
+| `aggressive` | ~70%+ | + intent extraction, local model if available |
 
+```bash
+mto optimize --level aggressive "your verbose prompt here"
 ```
-You type:                                         What the AI tool receives:
-────────────────────────────────────────────────────────────────────────────────
-codex "Please please help me fix this             codex "Fix this recurring
-error over and over I don't know what             error. Provide fix command."
-to do please explain and give me the
-command"
 
-git push origin main                              git push origin main (unchanged)
-```
+Default level is set in config or via `export MTO_OPTIMIZATION_LEVEL=aggressive`.
 
 ---
 
-## Optimization Levels
+## What It Does vs. What It Doesn't
+
+| Does | Doesn't |
+|------|---------|
+| Compress natural-language prompts before they reach AI CLIs | Filter or modify command *outputs* |
+| Observe shell commands (metadata only, redacted) | Replace your shell or act as a proxy |
+| Run a local model for semantic compression | Call any remote API or cloud service |
+| Preserve code blocks, file paths, error messages | Touch executable shell commands |
+| Store redacted analytics in local SQLite | Store raw secrets or full command text |
+
+---
+
+## Verification
 
 ```bash
-mto optimize --level conservative "verbose text"   # ~30% savings, safe
-mto optimize --level moderate "verbose text"       # ~60% savings
-mto optimize --level aggressive "verbose text"     # ~70%+ savings, uses model if available
-```
+# Classify input type and risk
+mto classify "rm -rf /"
+mto classify "Please help me fix this error"
 
-Set default level in `~/.config/mto/config.json` or via env:
+# Compare compression levels
+mto optimize "Please please help me fix this issue over and over"
+mto optimize --level moderate "Please please help me fix this issue over and over"
+mto optimize --level aggressive "Please please help me fix this issue over and over"
 
-```bash
-export MTO_OPTIMIZATION_LEVEL=aggressive
+# Full metadata output
+mto optimize --level aggressive --json "I really need help. Can you explain what is wrong?"
+
+# Dry-run (shows what would happen, doesn't execute)
+mto exec --optimize --dry-run -- codex "Please please help me fix this"
+
+# Shell commands are never modified
+mto optimize "git push origin main"
+
+# Skip compression for one command
+MTO_DISABLED=1 codex "leave this alone"
+
+# Analytics
+mto stats
+mto stats --json
+mto stats --reset
+
+# Current config
+mto config
+mto status
+mto model status
 ```
 
 ---
 
 ## Configuration
 
-### Config file location
-
-| Platform | Path |
-|----------|------|
-| Linux/macOS | `~/.config/mto/config.json` |
+`~/.config/mto/config.json`
 
 ```bash
-mto config            # show current configuration
-mto config --create   # create config file with defaults
+mto config            # show current
+mto config --create   # create with defaults
 ```
-
-### Full config structure
 
 ```json
 {
@@ -120,144 +146,62 @@ mto config --create   # create config file with defaults
 }
 ```
 
-### Environment variables
+### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `MTO_DISABLED=1` | Disable mto for a single command (`MTO_DISABLED=1 codex "..."`) |
-| `MTO_OPTIMIZATION_LEVEL` | Override optimization level |
-| `MTO_WRAP_COMMANDS` | Override wrapped commands |
-| `MTO_TEE_DIR` | Override tee output directory |
-| `MTO_DB_PATH` | Override SQLite database path |
-| `MTO_ENABLED=0` | Disable mto globally |
+| Variable | Effect |
+|----------|--------|
+| `MTO_DISABLED=1` | Skip optimization for this single command |
+| `MTO_ENABLED=0` | Disable globally |
+| `MTO_OPTIMIZATION_LEVEL` | Override compression level |
+| `MTO_WRAP_COMMANDS` | Override which tools are wrapped |
+| `MTO_TEE_DIR` | Override failure output directory |
+| `MTO_DB_PATH` | Override SQLite path |
 
-### Tee system
+### Failure Output Capture
 
-When a wrapped command fails, mto saves the full raw output to a local file:
+When a wrapped command exits non-zero, the full output is saved locally:
 
 ```
-FAILED: exit code 1
 [full output: ~/.local/share/mto/tee/1707753600_cargo_test.log]
 ```
 
-Your AI assistant can read the file for full context without re-running the command.
+Your AI tool can read the file for context without re-running.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `tee_enabled` | `true` | Enable/disable |
-| `tee_mode` | `"failures"` | `"failures"`, `"always"`, `"never"` |
-| `tee_max_files` | `20` | Rotation: keep last N files |
-| Min size | 500 bytes | Outputs shorter than this are not saved |
-| Max size | 1 MB | Truncated above this |
+### Excluding Commands
 
-### Excluding commands from auto-rewrite
-
-Prevent specific commands from being optimized by the hook:
+Commands that should never be rewritten:
 
 ```json
-{
-  "exclude_commands": ["git rebase", "git cherry-pick", "docker exec"]
-}
+{ "exclude_commands": ["git rebase", "^curl", "docker exec"] }
 ```
 
-Patterns match against the full command after stripping env prefixes (`sudo`, `VAR=val`):
-- `"psql"` excludes both `psql -h localhost` and `PGPASSWORD=x psql -h localhost`
-- `"git push"` excludes `git push origin main` but not `git status`
+Patterns match after stripping `sudo`/env prefixes. `^` prefix enables regex.
 
-Patterns starting with `^` are treated as regex:
+Single-command skip: `MTO_DISABLED=1 git rebase main`
+
+### Per-Project Overrides
+
+Drop `.mto/filters.json` in your project root:
 
 ```json
-{
-  "exclude_commands": ["^curl", "^wget", "git rebase"]
-}
+{ "exclude_commands": ["npm test", "cargo build"] }
 ```
 
-Or for a single invocation:
-
-```bash
-MTO_DISABLED=1 git rebase main
-```
-
-### Per-project filters
-
-Create `.mto/filters.json` in your project root to add project-specific exclude commands:
-
-```json
-{
-  "exclude_commands": ["npm test", "cargo build"]
-}
-```
-
-These merge with your global config.
+Merges with global config.
 
 ---
 
-## Test Commands
+## Shell Integration
 
 ```bash
-# Run test suite
-pytest
-
-# Classify a command (shows type + risk)
-mto classify "rm -rf /"
-mto classify "Please help me fix this error"
-
-# Optimize text at each level
-mto optimize "Please please help me fix this issue over and over"
-mto optimize --level moderate "Please please help me fix this issue over and over"
-mto optimize --level aggressive "Please please help me fix this issue over and over"
-
-# JSON output with full metadata
-mto optimize --level aggressive --json "I really need help. Can you explain what is wrong?"
-
-# Dry-run exec (shows what would happen, doesn't execute)
-mto exec --optimize --dry-run -- codex "Please please help me fix this"
-
-# Shell command preserved (never optimized)
-mto optimize "git push origin main"
-
-# Disable for single command
-MTO_DISABLED=1 mto optimize "this will not be optimized"
-
-# Check model status
-mto model status
-
-# View config
-mto config
-
-# View stats
-mto stats
-mto stats --json
-
-# Check active config
-mto status
-```
-
----
-
-## Reset Stats
-
-Clear all observation and optimization history:
-
-```bash
-mto stats --reset
-```
-
-This deletes all data from the SQLite database (shell events, optimization runs, patterns, feedback) while keeping the database file and config intact.
-
----
-
-## Shell Hook Management
-
-```bash
-# Install (persistent, survives shell restarts)
+# Install permanently
 mto install-shell --shell zsh --wrap codex,claude,llm
 source ~/.zshrc
 
-# Uninstall
+# Remove
 mto uninstall-shell --shell zsh
 
-# One-session only (no file modification)
+# Temporary session (no file changes)
 eval "$(mto shell-hook zsh --wrap codex,claude,llm)"
 
 # Disable for current session
@@ -266,28 +210,13 @@ mto_unmount
 
 ---
 
-## Local Model
+## Safety
 
-The optional local model uses `llama-cpp-python` with a quantized Qwen2-0.5B GGUF (~353MB). It runs entirely offline with no API calls.
-
-```bash
-pip install -e ".[model]"    # installs llama-cpp-python + huggingface-hub
-mto model download           # downloads model to ~/.local/share/mto/models/
-mto model status             # verify
-```
-
-The model activates automatically in `moderate` and `aggressive` modes as an additional compression candidate. If its output drops critical content (code blocks, paths, errors), the rule-based result is used instead.
-
----
-
-## Safety Model
-
-- Never silently rewrites executable shell commands
-- Never executes dangerous commands on its own
-- Detects high-risk commands (`rm -rf`, `sudo`, `chmod -R`, `dd`, `mkfs`, `curl | sh`, `kubectl delete`, `terraform destroy`, etc.)
-- Redacts secrets before SQLite storage
-- Preserves code blocks, file paths, and error lines in optimized output
-- Model output rejected if it drops any critical content
+- Shell commands are **never** rewritten or executed
+- Dangerous commands are detected and flagged (`rm -rf`, `sudo`, `chmod -R`, `dd`, `mkfs`, `curl | sh`, `kubectl delete`, `terraform destroy`)
+- Secrets are redacted before storage
+- Code blocks, file paths, and error messages are preserved in compressed output
+- Model output is rejected if it drops any critical content
 
 ---
 
@@ -298,17 +227,30 @@ pip install -e ".[dev]"
 pytest
 ```
 
-33 tests covering: classification, optimization levels, secret redaction, shell hooks, CLI integration, model integration, and SQLite storage.
+33 tests: classification, compression levels, secret redaction, shell hooks, CLI, model integration, SQLite storage.
 
 ---
 
-## Non-goals
+## Architecture
 
-`mto` does not:
-
-- Replace your shell
-- Act as an LLM agent
-- Call a remote model/API
-- Transparently rewrite executable commands
-- Require cloud services
-- Store raw secrets
+```
+┌────────────────────────────────────────────────────┐
+│  Your shell (zsh/bash)                              │
+│                                                     │
+│  preexec hook → observes every command (SQLite log) │
+│                                                     │
+│  Wrapped AI tools (codex, claude, llm, ...):        │
+│    ┌──────────────────────────────────────────┐     │
+│    │ 1. Extract text payload from args/stdin  │     │
+│    │ 2. Classify (shell? prompt? code? log?)  │     │
+│    │ 3. If AI-bound text:                     │     │
+│    │    a. Rule-based compression             │     │
+│    │    b. Local model compression (optional) │     │
+│    │    c. Safety check (paths/code/errors)   │     │
+│    │    d. Pick shortest safe candidate       │     │
+│    │ 4. Execute real command with shorter text │     │
+│    └──────────────────────────────────────────┘     │
+│                                                     │
+│  Non-wrapped commands: pass through unchanged       │
+└────────────────────────────────────────────────────┘
+```
